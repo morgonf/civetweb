@@ -5,7 +5,7 @@ cmake_policy(SET CMP0054 NEW)
 cmake_policy(SET CMP0057 NEW)
 
 # Set up the project
-project (civetweb)
+project(civetweb VERSION 1.16.0)
 
 # Detect the platform reliably
 if(ZEPHYR_BASE)
@@ -37,7 +37,7 @@ include(AddCXXCompilerFlag)
 include(DetermineTargetArchitecture)
 include(CMakeDependentOption)
 
-set(CIVETWEB_VERSION "1.15.0" CACHE STRING "The version of the civetweb library")
+set(CIVETWEB_VERSION "1.16.0" CACHE STRING "The version of the civetweb library")
 string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)" CIVETWEB_VERSION_MATCH "${CIVETWEB_VERSION}")
 if ("${CIVETWEB_VERSION_MATCH}" STREQUAL "")
   message(FATAL_ERROR "Must specify a semantic version: major.minor.patch")
@@ -135,7 +135,7 @@ endif()
 
 # Link to the shared LUA library
 cmake_dependent_option(
-  CIVETWEB_ENABLE_LUA_SHARED  "Link to the shared LUA system library" OFF
+	CIVETWEB_ENABLE_LUA_SHARED  "Link to the shared LUA system library" OFF
  CIVETWEB_ENABLE_LUA OFF)
 if (CIVETWEB_ENABLE_LUA)
   message(STATUS "Linking shared Lua library - ${CIVETWEB_ENABLE_LUA_SHARED}")
@@ -629,13 +629,13 @@ configure_file(
 install(
   FILES 
     "${PROJECT_BINARY_DIR}/${PROJECT_NAME}.pc"
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/pkgconfig"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
 )
 
 install(
   FILES 
     "${PROJECT_BINARY_DIR}/${PROJECT_NAME}-cpp.pc"
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/pkgconfig"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
 )
 
 write_basic_package_version_file(${PROJECT_NAME}-config-version.cmake
