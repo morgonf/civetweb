@@ -1,3 +1,2 @@
 spec: .gear/civetweb.spec
-tar: v@version@:.
-diff: v@version@:. .
+tar: git588860e:.

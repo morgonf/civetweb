@@ -4,9 +4,12 @@
 %def_disable lua
 %def_disable duktape
 
+%define commit 588860e30721bf5453b0440c390865a8e85dcae5
+%global shortcommit %(c=%{commit}; echo ${c:0:7})
+
 Name: civetweb
 Version: 1.16
-Release: alt1
+Release: alt2.git%shortcommit
 
 Summary: Embedded C/C++ web server
 License: MIT
@@ -14,8 +17,6 @@ Group: Networking/WWW
 
 Url: https://github.com/civetweb/civetweb
 Source: %name-%version.tar
-
-Patch0: %name-%version-%release.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
@@ -64,7 +65,6 @@ This package contains shared libs for Civetweb server.
 
 %prep
 %setup
-%patch0 -p1
 
 %build
 %cmake . \
@@ -111,6 +111,11 @@ mkdir -p %buildroot%_docdir/civetweb
 %_pkgconfigdir/*.pc
 
 %changelog
+* Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt2.git588860e
+- Fixed CVE-2025-55763: refactor request handling to disallow chunked
+  encoding combined with content-length header
+- Updated to upstream git snapshot %shortcommit
+
 * Sun Jul 02 2023 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt1
 - Initial build for Sisyphus (based on fedora spec)
   + patch CmakeLists.txt to add project version explicitly
