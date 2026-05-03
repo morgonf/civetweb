@@ -5,7 +5,7 @@
 #if !defined(CIVETWEB_PRIVATE_LUA_H)
 #define CIVETWEB_PRIVATE_LUA_H
 
-int run_lua(const char *file_name);
+CIVETWEB_API int run_lua(const char *file_name);
 
 
 #endif

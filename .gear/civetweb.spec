@@ -1,15 +1,15 @@
 %define soname 1
 %def_enable ssl
 %def_enable zlib
-%def_disable lua
-%def_disable duktape
+%def_enable lua
+%def_enable duktape
 
 %define commit 588860e30721bf5453b0440c390865a8e85dcae5
 %global shortcommit %(c=%{commit}; echo ${c:0:7})
 
 Name: civetweb
 Version: 1.16
-Release: alt3.git%shortcommit
+Release: alt4.git%shortcommit
 
 Summary: Embedded C/C++ web server
 License: MIT
@@ -18,6 +18,7 @@ Group: Networking/WWW
 Url: https://github.com/civetweb/civetweb
 Source: %name-%version.tar
 Patch0: 0001-use-system-check.patch
+Patch1: 0002-use-system-lua-duktape.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
@@ -68,6 +69,7 @@ This package contains shared libs for Civetweb server.
 %prep
 %setup
 %patch0 -p1
+%patch1 -p1
 
 %build
 %cmake . \
@@ -98,7 +100,7 @@ This package contains shared libs for Civetweb server.
 # Skipped tests:
 #  - minimal-http(s)-client: require external DNS (github.com/google.com)
 #  - start-stop-http-server-ipv6: IPv6 loopback may be unavailable in chroot
-#  - init-library: hardcoded feature count depends on build config (Lua/Duktape off)
+#  - init-library: hardcoded feature count depends on build config
 #  - minimal-https-server, start-stop-https-server, tls-server-client,
 #    server-requests, large-file: SSL cert lookup uses ../../resources/ path
 #    which does not resolve correctly from cmake build dir
@@ -117,15 +119,30 @@ mkdir -p %buildroot%_docdir/civetweb
 %files -n lib%name%soname
 %_libdir/libcivetweb.so.%soname.*
 %_libdir/libcivetweb-cpp.so.%soname.*
+%if_enabled lua
+%_libdir/liblua-library.so.%soname.*
+%endif
 
 %files -n %name-devel
 %_includedir/*.h
 %_libdir/cmake/civetweb
 %_libdir/libcivetweb.so
 %_libdir/libcivetweb-cpp.so
+%if_enabled lua
+%_libdir/liblua-library.so
+%endif
 %_pkgconfigdir/*.pc
 
 %changelog
+* Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt4.git588860e
+- Enable Lua 5.3 and Duktape support via system libraries
+- Patch src/CMakeLists.txt: replace ExternalProject_Add downloads (luafilesystem,
+  luasqlite, luaxml, sqlite, lua) with system lua5.3 (pkg-config) and bundled
+  sources from src/third_party/; link system libduktape (pkg-config)
+- BuildRequires: liblua5.3-devel libduktape-devel
+- mod_duktape.inl already has DUK_VERSION >= 20000L guards (API-compatible with 2.7.0)
+- lua-library.so built from bundled lfs/lsqlite3/LuaXML_lib/sqlite3 extras
+
 * Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt3.git588860e
 - Add %%check: 41 unit tests via system libcheck (patch: use system check
   instead of ExternalProject_Add downloading from github)
