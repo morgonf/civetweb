@@ -9,7 +9,7 @@
 
 Name: civetweb
 Version: 1.16
-Release: alt2.git%shortcommit
+Release: alt3.git%shortcommit
 
 Summary: Embedded C/C++ web server
 License: MIT
@@ -17,9 +17,11 @@ Group: Networking/WWW
 
 Url: https://github.com/civetweb/civetweb
 Source: %name-%version.tar
+Patch0: 0001-use-system-check.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
+BuildRequires: ctest libcheck-devel
 
 %if_enabled zlib
 BuildRequires: zlib-devel
@@ -65,6 +67,7 @@ This package contains shared libs for Civetweb server.
 
 %prep
 %setup
+%patch0 -p1
 
 %build
 %cmake . \
@@ -73,7 +76,7 @@ This package contains shared libs for Civetweb server.
     -DBUILD_CONFIG=rpmbuild \
     -DCIVETWEB_ENABLE_CXX:BOOL=ON \
     -DBUILD_SHARED_LIBS:BOOL=ON \
-    -DCIVETWEB_BUILD_TESTING:BOOL=OFF \
+    -DCIVETWEB_BUILD_TESTING:BOOL=ON \
 %if_enabled lua
     -DCIVETWEB_ENABLE_LUA:BOOL=ON \
     -DCIVETWEB_ENABLE_LUA_SHARED:BOOL=ON \
@@ -90,6 +93,18 @@ This package contains shared libs for Civetweb server.
 %nil
 
 %cmake_build
+
+%check
+# Skipped tests:
+#  - minimal-http(s)-client: require external DNS (github.com/google.com)
+#  - start-stop-http-server-ipv6: IPv6 loopback may be unavailable in chroot
+#  - init-library: hardcoded feature count depends on build config (Lua/Duktape off)
+#  - minimal-https-server, start-stop-https-server, tls-server-client,
+#    server-requests, large-file: SSL cert lookup uses ../../resources/ path
+#    which does not resolve correctly from cmake build dir
+cd %_cmake__builddir
+CTEST_OUTPUT_ON_FAILURE=1 \
+    ctest -E 'test-publicserver-init-library|test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6|test-publicserver-minimal-https-server|test-publicserver-start-stop-https-server|test-publicserver-tls-server-client|test-publicserver-server-requests|test-publicserver-large-file'
 
 %install
 %cmake_install
@@ -111,9 +126,19 @@ mkdir -p %buildroot%_docdir/civetweb
 %_pkgconfigdir/*.pc
 
 %changelog
+* Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt3.git588860e
+- Add %%check: 41 unit tests via system libcheck (patch: use system check
+  instead of ExternalProject_Add downloading from github)
+- BuildRequires: ctest libcheck-devel
+- Exclude 9 tests incompatible with hasher environment:
+  external-network (http/https client), IPv6 loopback, SSL cert path,
+  init-library (feature count depends on build config)
+
 * Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt2.git588860e
 - Fixed CVE-2025-55763: refactor request handling to disallow chunked
   encoding combined with content-length header
+- Fixed CVE-2026-5789: unquoted search path in Windows service installation
+  (Windows-only, commit 3c0fb6ad, included in snapshot %shortcommit)
 - Updated to upstream git snapshot %shortcommit
 
 * Sun Jul 02 2023 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt1

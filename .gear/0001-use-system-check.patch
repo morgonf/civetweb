@@ -1,0 +1,130 @@
+diff --git a/unittest/CMakeLists.txt b/unittest/CMakeLists.txt
+index 7aa34971..f2d3c42b 100644
+--- a/unittest/CMakeLists.txt
++++ b/unittest/CMakeLists.txt
+@@ -7,59 +7,10 @@ endif()
+ 
+ message(STATUS "CMAKE UNIT TEST LINE 8")
+ 
+-# We use the check unit testing framework for our C unit tests
+-include(ExternalProject)
+-IF (DEFINED ENV{CHECK_URL})
+-SET (CHECK_URL $ENV{CHECK_URL})
+-ELSE()
+-SET (CHECK_URL "https://github.com/civetweb/check/archive/master.zip")
+-ENDIF()
+-
+-## Print what version of the CHECK unit test framework we are using
+-message(STATUS "Using check unit test framework from ${CHECK_URL}")
+-
+-ExternalProject_Add(check-unit-test-framework
+-  DEPENDS civetweb-c-library
+-
+-URL ${CHECK_URL}
+-DOWNLOAD_NAME "master.zip"
+-
+-  PREFIX "${CIVETWEB_THIRD_PARTY_DIR}"
+-  BUILD_IN_SOURCE 1
+-  CMAKE_ARGS
+-    "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+-    "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+-    "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
+-  LOG_DOWNLOAD ${THIRD_PARTY_LOGGING}
+-  LOG_UPDATE ${THIRD_PARTY_LOGGING}
+-  LOG_CONFIGURE ${THIRD_PARTY_LOGGING}
+-  LOG_BUILD ${THIRD_PARTY_LOGGING}
+-  LOG_TEST ${THIRD_PARTY_LOGGING}
+-  LOG_INSTALL ${THIRD_PARTY_LOGGING})
+-  
+-  
+-ExternalProject_Get_Property(check-unit-test-framework INSTALL_DIR)
+-set(CHECK_INSTALL_DIR ${INSTALL_DIR})
+-unset(INSTALL_DIR)
+-link_directories("${CHECK_INSTALL_DIR}/lib")
+-include_directories("${CHECK_INSTALL_DIR}/include")
+-if ((WIN32 AND MINGW) OR APPLE)
+-  set(CHECK_LIBRARIES "${CHECK_LIBRARIES};${CHECK_INSTALL_DIR}/lib/libcheck.a")
+-  set(CHECK_LIBRARIES "${CHECK_LIBRARIES};${CHECK_INSTALL_DIR}/lib/libcompat.a")
+-elseif (WIN32)
+-  set(CHECK_LIBRARIES "${CHECK_LIBRARIES};${CHECK_INSTALL_DIR}/lib/check.lib")
+-  set(CHECK_LIBRARIES "${CHECK_LIBRARIES};${CHECK_INSTALL_DIR}/lib/compat.lib")
+-else()
+-  set(CHECK_LIBRARIES "${CHECK_INSTALL_DIR}/lib/libcheck.a")
+-endif()
+-find_package(LibM)
+-if (LIBM_FOUND)
+-  set(CHECK_LIBRARIES "${CHECK_LIBRARIES};LIBM::LIBM")
+-endif()
+-find_package(LibRt)
+-if (LIBRT_FOUND)
+-  set(CHECK_LIBRARIES "${CHECK_LIBRARIES};LIBRT::LIBRT")
+-endif()
++# We use the system-installed Check unit testing framework
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(CHECK REQUIRED check IMPORTED_TARGET)
++message(STATUS "Using system check unit test framework ${CHECK_VERSION}")
+ 
+ # Build the C unit tests
+ add_library(shared-c-unit-tests STATIC shared.c)
+@@ -74,8 +25,8 @@ endif()
+ target_include_directories(
+   public-func-c-unit-tests PUBLIC
+   ${PROJECT_SOURCE_DIR}/include)
+-target_link_libraries(public-func-c-unit-tests civetweb-c-library ${CHECK_LIBRARIES})
+-add_dependencies(public-func-c-unit-tests check-unit-test-framework)
++target_link_libraries(public-func-c-unit-tests civetweb-c-library PkgConfig::CHECK)
++
+ 
+ add_library(public-server-c-unit-tests STATIC public_server.c)
+ if (BUILD_SHARED_LIBS)
+@@ -84,22 +35,22 @@ endif()
+ target_include_directories(
+   public-server-c-unit-tests PUBLIC
+   ${PROJECT_SOURCE_DIR}/include)
+-target_link_libraries(public-server-c-unit-tests civetweb-c-library ${CHECK_LIBRARIES})
+-add_dependencies(public-server-c-unit-tests check-unit-test-framework)
++target_link_libraries(public-server-c-unit-tests civetweb-c-library PkgConfig::CHECK)
++
+ 
+ add_library(private-c-unit-tests STATIC private.c)
+ target_include_directories(
+   private-c-unit-tests PUBLIC
+   ${PROJECT_SOURCE_DIR}/include)
+-target_link_libraries(private-c-unit-tests ${CHECK_LIBRARIES})
+-add_dependencies(private-c-unit-tests check-unit-test-framework)
++target_link_libraries(private-c-unit-tests PkgConfig::CHECK)
++
+ 
+ add_library(timer-c-unit-tests STATIC timertest.c)
+ target_include_directories(
+   timer-c-unit-tests PUBLIC
+   ${PROJECT_SOURCE_DIR}/include)
+-target_link_libraries(timer-c-unit-tests ${CHECK_LIBRARIES})
+-add_dependencies(timer-c-unit-tests check-unit-test-framework)
++target_link_libraries(timer-c-unit-tests PkgConfig::CHECK)
++
+ 
+ add_library(exe-c-unit-tests STATIC private_exe.c)
+ if (BUILD_SHARED_LIBS)
+@@ -108,8 +59,8 @@ endif()
+ target_include_directories(
+   exe-c-unit-tests PUBLIC
+   ${PROJECT_SOURCE_DIR}/include)
+-target_link_libraries(exe-c-unit-tests civetweb-c-library ${CHECK_LIBRARIES})
+-add_dependencies(exe-c-unit-tests check-unit-test-framework)
++target_link_libraries(exe-c-unit-tests civetweb-c-library PkgConfig::CHECK)
++
+ 
+ add_executable(main-c-unit-test main.c)
+ target_link_libraries(main-c-unit-test
+@@ -119,8 +70,8 @@ target_link_libraries(main-c-unit-test
+   private-c-unit-tests
+   timer-c-unit-tests
+   exe-c-unit-tests
+-  ${CHECK_LIBRARIES})
+-add_dependencies(main-c-unit-test check-unit-test-framework)
++  PkgConfig::CHECK)
++
+ 
+ # Add a check command that builds the dependent test program
+ add_custom_target(check
