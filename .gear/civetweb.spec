@@ -19,6 +19,7 @@ Url: https://github.com/civetweb/civetweb
 Source: %name-%version.tar
 Patch0: 0001-use-system-check.patch
 Patch1: 0002-use-system-lua-duktape.patch
+Patch2: 0003-fix-svace-null-after-deref-and-use-after-free.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
@@ -70,6 +71,7 @@ This package contains shared libs for Civetweb server.
 %setup
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
 
 %build
 %cmake . \
