@@ -3,3 +3,4 @@ tar: git588860e:.
 copy: .gear/0001-use-system-check.patch
 copy: .gear/0002-use-system-lua-duktape.patch
 copy: .gear/0003-fix-svace-null-after-deref-and-use-after-free.patch
+copy: .gear/0004-fix-test-ssl-cert-path-and-init-library.patch
