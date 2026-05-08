@@ -20,13 +20,18 @@ Source: %name-%version.tar
 Patch0: 0001-use-system-check.patch
 Patch1: 0002-use-system-lua-duktape.patch
 Patch2: 0003-fix-svace-null-after-deref-and-use-after-free.patch
+Patch3: 0004-fix-test-ssl-cert-path-and-init-library.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
+BuildRequires: rpm-build-vm
 BuildRequires: ctest libcheck-devel
 
 %if_enabled zlib
 BuildRequires: zlib-devel
+%endif
+%if_enabled ssl
+BuildRequires: openssl-devel
 %endif
 %if_enabled duktape
 BuildRequires: libduktape-devel
@@ -72,6 +77,7 @@ This package contains shared libs for Civetweb server.
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
+%patch3 -p1
 
 %build
 %cmake . \
@@ -87,6 +93,7 @@ This package contains shared libs for Civetweb server.
 %endif
 %if_enabled ssl
     -DCIVETWEB_ENABLE_SSL:BOOL=ON \
+    -DCIVETWEB_ENABLE_SSL_DYNAMIC_LOADING:BOOL=OFF \
 %endif
 %if_enabled zlib
     -DCIVETWEB_ENABLE_ZLIB:BOOL=ON \
@@ -99,16 +106,15 @@ This package contains shared libs for Civetweb server.
 %cmake_build
 
 %check
-# Skipped tests:
-#  - minimal-http(s)-client: require external DNS (github.com/google.com)
-#  - start-stop-http-server-ipv6: IPv6 loopback may be unavailable in chroot
-#  - init-library: hardcoded feature count depends on build config
-#  - minimal-https-server, start-stop-https-server, tls-server-client,
-#    server-requests, large-file: SSL cert lookup uses ../../resources/ path
-#    which does not resolve correctly from cmake build dir
+# Excluded: minimal-http(s)-client connect to github.com/google.com (external DNS unavailable)
+# IPv6 loopback requires full kernel — run via vm-run --kvm=cond (skipped gracefully without KVM)
+# SSL cert tests fixed: WORKING_DIRECTORY=${CMAKE_SOURCE_DIR} + LOCAL_TEST (patch 0004)
+# init-library fixed: NO_SSL_DL (direct OpenSSL linking, no dlopen)
 cd %_cmake__builddir
 CTEST_OUTPUT_ON_FAILURE=1 \
-    ctest -E 'test-publicserver-init-library|test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6|test-publicserver-minimal-https-server|test-publicserver-start-stop-https-server|test-publicserver-tls-server-client|test-publicserver-server-requests|test-publicserver-large-file'
+    ctest -E 'test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6'
+vm-run --kvm=cond \
+    "cd %_cmake__builddir && CTEST_OUTPUT_ON_FAILURE=1 ctest -R test-publicserver-start-stop-http-server-ipv6"
 
 %install
 %cmake_install
