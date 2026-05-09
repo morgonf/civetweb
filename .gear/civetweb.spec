@@ -10,7 +10,7 @@
 
 Name: civetweb
 Version: 1.16
-Release: alt4.git%shortcommit
+Release: alt5.git%shortcommit
 
 Summary: Embedded C/C++ web server
 License: MIT
@@ -23,6 +23,7 @@ Patch1: 0002-use-system-lua-duktape.patch
 Patch2: 0003-fix-svace-null-after-deref-and-use-after-free.patch
 Patch3: 0004-fix-test-ssl-cert-path-and-init-library.patch
 Patch4: 0005-add-lua-duktape-integration-tests.patch
+Patch5: 0006-fix-tls-test-for-openssl3-api.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
@@ -81,6 +82,7 @@ This package contains shared libs for Civetweb server.
 %patch2 -p1
 %patch3 -p1
 %patch4 -p1
+%patch5 -p1
 
 %build
 %cmake . \
@@ -90,6 +92,7 @@ This package contains shared libs for Civetweb server.
     -DCIVETWEB_ENABLE_CXX:BOOL=ON \
     -DBUILD_SHARED_LIBS:BOOL=ON \
     -DCIVETWEB_BUILD_TESTING:BOOL=ON \
+    -DCIVETWEB_ENABLE_WEBSOCKETS:BOOL=ON \
 %if_enabled lua
     -DCIVETWEB_ENABLE_LUA:BOOL=ON \
     -DCIVETWEB_ENABLE_LUA_SHARED:BOOL=ON \
@@ -97,6 +100,8 @@ This package contains shared libs for Civetweb server.
 %if_enabled ssl
     -DCIVETWEB_ENABLE_SSL:BOOL=ON \
     -DCIVETWEB_ENABLE_SSL_DYNAMIC_LOADING:BOOL=OFF \
+    -DCIVETWEB_SSL_OPENSSL_API_1_1:BOOL=OFF \
+    -DCIVETWEB_SSL_OPENSSL_API_3_0:BOOL=ON \
 %endif
 %if_enabled zlib
     -DCIVETWEB_ENABLE_ZLIB:BOOL=ON \
@@ -153,6 +158,11 @@ mkdir -p %buildroot%_docdir/civetweb
 %_pkgconfigdir/*.pc
 
 %changelog
+* Fri May 09 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt5.git588860e
+- Enable WebSocket support (CIVETWEB_ENABLE_WEBSOCKETS=ON)
+- Switch to OpenSSL 3.0 native API (CIVETWEB_SSL_OPENSSL_API_3_0=ON,
+  CIVETWEB_SSL_OPENSSL_API_1_1=OFF); system OpenSSL is 3.5.x
+
 * Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt4.git588860e
 - Enable Lua 5.3 and Duktape support via system libraries
 - Patch src/CMakeLists.txt: replace ExternalProject_Add downloads (luafilesystem,
