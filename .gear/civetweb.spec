@@ -110,6 +110,9 @@ This package contains shared libs for Civetweb server.
 # IPv6 loopback requires full kernel — run via vm-run --kvm=cond (skipped gracefully without KVM)
 # SSL cert tests fixed: WORKING_DIRECTORY=${CMAKE_SOURCE_DIR} + LOCAL_TEST (patch 0004)
 # init-library fixed: NO_SSL_DL (direct OpenSSL linking, no dlopen)
+# server-requests needs cgi_test.cgi pre-built (not a CMake target)
+mkdir -p output
+gcc -o output/cgi_test.cgi unittest/cgi_test.c
 cd %_cmake__builddir
 CTEST_OUTPUT_ON_FAILURE=1 \
     ctest -E 'test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6'
