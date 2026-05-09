@@ -16,7 +16,7 @@ index 909eabef..cf31c080 100644
  # Timer tests
  civetweb_add_test(Timer "Timer Single Shot")
 diff --git a/unittest/public_server.c b/unittest/public_server.c
-index 2ae9a944..536ea774 100644
+index 2ae9a944..a484987e 100644
 --- a/unittest/public_server.c
 +++ b/unittest/public_server.c
 @@ -5018,6 +5018,259 @@ START_TEST(test_minimal_https_server_callback)
@@ -292,11 +292,10 @@ index 2ae9a944..536ea774 100644
  
  
  	tcase_add_test(tcase_checktestenv, test_the_test_environment);
-@@ -5260,6 +5519,17 @@ make_public_server_suite(void)
- 	tcase_add_test(tcase_duktape_script, test_duktape_script);
+@@ -5261,6 +5520,16 @@ make_public_server_suite(void)
  	tcase_set_timeout(tcase_duktape_script, civetweb_min_server_test_timeout);
  	suite_add_tcase(suite, tcase_duktape_script);
-+#endif
+ #endif
 +#if defined(USE_WEBSOCKET)
 +	tcase_add_test(tcase_websocket_basic, test_websocket_basic);
 +	tcase_set_timeout(tcase_websocket_basic, civetweb_min_server_test_timeout);
@@ -307,6 +306,6 @@ index 2ae9a944..536ea774 100644
 +	tcase_set_timeout(tcase_tls_openssl3, civetweb_min_server_test_timeout);
 +	suite_add_tcase(suite, tcase_tls_openssl3);
 +#endif
- #endif
  
  	return suite;
+ }
