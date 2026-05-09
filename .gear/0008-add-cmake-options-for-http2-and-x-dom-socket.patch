@@ -1,0 +1,32 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 42519d20..053cd1db 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -92,6 +92,14 @@ message(STATUS "Websockets support - ${CIVETWEB_ENABLE_WEBSOCKETS}")
+ option(CIVETWEB_ENABLE_SERVER_STATS "Enable server statistics" OFF)
+ message(STATUS "Server statistics support - ${CIVETWEB_ENABLE_SERVER_STATS}")
+ 
++# HTTP/2 support (experimental, requires SSL/ALPN)
++option(CIVETWEB_ENABLE_HTTP2 "Enable experimental HTTP/2 support (requires SSL)" OFF)
++message(STATUS "HTTP/2 support (experimental) - ${CIVETWEB_ENABLE_HTTP2}")
++
++# Unix domain socket support
++option(CIVETWEB_ENABLE_UNIX_DOMAIN_SOCKETS "Enable Unix domain socket support" OFF)
++message(STATUS "Unix domain socket support - ${CIVETWEB_ENABLE_UNIX_DOMAIN_SOCKETS}")
++
+ # Memory debugging
+ option(CIVETWEB_ENABLE_MEMORY_DEBUGGING "Enable the memory debugging features" OFF)
+ message(STATUS "Memory Debugging - ${CIVETWEB_ENABLE_MEMORY_DEBUGGING}")
+@@ -497,6 +505,12 @@ endif()
+ if (CIVETWEB_ENABLE_SERVER_STATS)
+   add_definitions(-DUSE_SERVER_STATS)
+ endif()
++if (CIVETWEB_ENABLE_HTTP2)
++  add_definitions(-DUSE_HTTP2)
++endif()
++if (CIVETWEB_ENABLE_UNIX_DOMAIN_SOCKETS)
++  add_definitions(-DUSE_X_DOM_SOCKET)
++endif()
+ if (CIVETWEB_SERVE_NO_FILES)
+   add_definitions(-DNO_FILES)
+ endif()

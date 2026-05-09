@@ -4,6 +4,9 @@
 %def_enable lua
 %def_enable duktape
 %def_with scripting_tests
+%def_disable server_stats
+%def_disable http2
+%def_disable x_dom_socket
 
 %define commit 588860e30721bf5453b0440c390865a8e85dcae5
 %global shortcommit %(c=%{commit}; echo ${c:0:7})
@@ -25,6 +28,8 @@ Patch3: 0004-fix-test-ssl-cert-path-and-init-library.patch
 Patch4: 0005-add-lua-duktape-integration-tests.patch
 Patch5: 0006-fix-tls-test-for-openssl3-api.patch
 Patch6: 0007-add-websocket-and-openssl3-tests.patch
+Patch7: 0008-add-cmake-options-for-http2-and-x-dom-socket.patch
+Patch8: 0009-fix-http2-debug-trace-pedantic-errors.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
@@ -85,6 +90,8 @@ This package contains shared libs for Civetweb server.
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
+%patch7 -p1
+%patch8 -p1
 
 %build
 %cmake . \
@@ -110,6 +117,15 @@ This package contains shared libs for Civetweb server.
 %endif
 %if_enabled duktape
     -DCIVETWEB_ENABLE_DUKTAPE:BOOL=ON \
+%endif
+%if_enabled server_stats
+    -DCIVETWEB_ENABLE_SERVER_STATS:BOOL=ON \
+%endif
+%if_enabled http2
+    -DCIVETWEB_ENABLE_HTTP2:BOOL=ON \
+%endif
+%if_enabled x_dom_socket
+    -DCIVETWEB_ENABLE_UNIX_DOMAIN_SOCKETS:BOOL=ON \
 %endif
 %nil
 
@@ -160,7 +176,7 @@ mkdir -p %buildroot%_docdir/civetweb
 %_pkgconfigdir/*.pc
 
 %changelog
-* Fri May 09 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt5.git588860e
+* Sat May 09 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt5.git588860e
 - Enable WebSocket support (CIVETWEB_ENABLE_WEBSOCKETS=ON)
 - Switch to OpenSSL 3.0 native API (CIVETWEB_SSL_OPENSSL_API_3_0=ON,
   CIVETWEB_SSL_OPENSSL_API_1_1=OFF); system OpenSSL is 3.5.x
@@ -169,6 +185,9 @@ mkdir -p %buildroot%_docdir/civetweb
   integration tests; WebSocket test exercises all 4 documented callbacks
   (connect/ready/data/close) and bidirectional framing; TLS test verifies
   runtime OpenSSL 3.x version and encrypted HTTP request/response
+- Add %def_disable options: server_stats, http2, x_dom_socket
+- patch 0008: add cmake options CIVETWEB_ENABLE_HTTP2 and
+  CIVETWEB_ENABLE_UNIX_DOMAIN_SOCKETS to CMakeLists.txt (not present upstream)
 
 * Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt4.git588860e
 - Enable Lua 5.3 and Duktape support via system libraries
