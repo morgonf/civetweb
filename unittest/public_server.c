@@ -5018,6 +5018,118 @@ START_TEST(test_minimal_https_server_callback)
 END_TEST
 
 
+#if defined(USE_LUA)
+START_TEST(test_lua_script)
+{
+	struct mg_context *ctx;
+	struct mg_callbacks callbacks;
+	const char *OPTIONS[8];
+	int opt_idx = 0;
+	const char *res_dir = locate_resources();
+	struct mg_connection *client_conn;
+	char client_err[256];
+	char client_data[256];
+	const struct mg_response_info *client_ri;
+	int client_res;
+
+	ck_assert(res_dir != NULL);
+
+	memset((void *)OPTIONS, 0, sizeof(OPTIONS));
+	OPTIONS[opt_idx++] = "listening_ports";
+	OPTIONS[opt_idx++] = "8090";
+	OPTIONS[opt_idx++] = "document_root";
+	OPTIONS[opt_idx++] = res_dir;
+	ck_assert_int_le(opt_idx, (int)(sizeof(OPTIONS) / sizeof(OPTIONS[0])));
+
+	memset(&callbacks, 0, sizeof(callbacks));
+	callbacks.log_message = log_msg_func;
+
+	ctx = test_mg_start(&callbacks, NULL, OPTIONS, __LINE__);
+	ck_assert(ctx != NULL);
+
+	test_sleep(1);
+
+	memset(client_err, 0, sizeof(client_err));
+	client_conn = mg_connect_client(
+	    "127.0.0.1", 8090, 0, client_err, sizeof(client_err));
+	ck_assert(client_conn != NULL);
+
+	mg_printf(client_conn, "GET /test_lua.lua HTTP/1.0\r\n\r\n");
+	client_res =
+	    mg_get_response(client_conn, client_err, sizeof(client_err), 10000);
+	ck_assert_int_gt(client_res, 0);
+
+	client_ri = mg_get_response_info(client_conn);
+	ck_assert(client_ri != NULL);
+	ck_assert_int_eq(client_ri->status_code, 200);
+
+	memset(client_data, 0, sizeof(client_data));
+	mg_read(client_conn, client_data, sizeof(client_data) - 1);
+	ck_assert(strstr(client_data, "Hello from Lua!") != NULL);
+
+	mg_close_connection(client_conn);
+	test_mg_stop(ctx, __LINE__);
+}
+END_TEST
+#endif /* USE_LUA */
+
+
+#if defined(USE_DUKTAPE)
+START_TEST(test_duktape_script)
+{
+	struct mg_context *ctx;
+	struct mg_callbacks callbacks;
+	const char *OPTIONS[8];
+	int opt_idx = 0;
+	const char *res_dir = locate_resources();
+	struct mg_connection *client_conn;
+	char client_err[256];
+	char client_data[256];
+	const struct mg_response_info *client_ri;
+	int client_res;
+
+	ck_assert(res_dir != NULL);
+
+	memset((void *)OPTIONS, 0, sizeof(OPTIONS));
+	OPTIONS[opt_idx++] = "listening_ports";
+	OPTIONS[opt_idx++] = "8091";
+	OPTIONS[opt_idx++] = "document_root";
+	OPTIONS[opt_idx++] = res_dir;
+	ck_assert_int_le(opt_idx, (int)(sizeof(OPTIONS) / sizeof(OPTIONS[0])));
+
+	memset(&callbacks, 0, sizeof(callbacks));
+	callbacks.log_message = log_msg_func;
+
+	ctx = test_mg_start(&callbacks, NULL, OPTIONS, __LINE__);
+	ck_assert(ctx != NULL);
+
+	test_sleep(1);
+
+	memset(client_err, 0, sizeof(client_err));
+	client_conn = mg_connect_client(
+	    "127.0.0.1", 8091, 0, client_err, sizeof(client_err));
+	ck_assert(client_conn != NULL);
+
+	mg_printf(client_conn, "GET /test_duktape.ssjs HTTP/1.0\r\n\r\n");
+	client_res =
+	    mg_get_response(client_conn, client_err, sizeof(client_err), 10000);
+	ck_assert_int_gt(client_res, 0);
+
+	client_ri = mg_get_response_info(client_conn);
+	ck_assert(client_ri != NULL);
+	ck_assert_int_eq(client_ri->status_code, 200);
+
+	memset(client_data, 0, sizeof(client_data));
+	mg_read(client_conn, client_data, sizeof(client_data) - 1);
+	ck_assert(strstr(client_data, "Hello from Duktape!") != NULL);
+
+	mg_close_connection(client_conn);
+	test_mg_stop(ctx, __LINE__);
+}
+END_TEST
+#endif /* USE_DUKTAPE */
+
+
 #if !defined(REPLACE_CHECK_FOR_LOCAL_DEBUGGING)
 Suite *
 make_public_server_suite(void)
@@ -5046,6 +5158,12 @@ make_public_server_suite(void)
 	TCase *const tcase_throttle = tcase_create("Limit speed");
 	TCase *const tcase_large_file = tcase_create("Large file");
 	TCase *const tcase_file_in_mem = tcase_create("File in memory");
+#if defined(USE_LUA)
+	TCase *const tcase_lua_script = tcase_create("Lua Script");
+#endif
+#if defined(USE_DUKTAPE)
+	TCase *const tcase_duktape_script = tcase_create("Duktape Script");
+#endif
 
 
 	tcase_add_test(tcase_checktestenv, test_the_test_environment);
@@ -5132,6 +5250,17 @@ make_public_server_suite(void)
 	tcase_add_test(tcase_large_file, test_large_file);
 	tcase_set_timeout(tcase_large_file, civetweb_mid_server_test_timeout);
 	suite_add_tcase(suite, tcase_large_file);
+
+#if defined(USE_LUA)
+	tcase_add_test(tcase_lua_script, test_lua_script);
+	tcase_set_timeout(tcase_lua_script, civetweb_min_server_test_timeout);
+	suite_add_tcase(suite, tcase_lua_script);
+#endif
+#if defined(USE_DUKTAPE)
+	tcase_add_test(tcase_duktape_script, test_duktape_script);
+	tcase_set_timeout(tcase_duktape_script, civetweb_min_server_test_timeout);
+	suite_add_tcase(suite, tcase_duktape_script);
+#endif
 
 	return suite;
 }

@@ -3,6 +3,7 @@
 %def_enable zlib
 %def_enable lua
 %def_enable duktape
+%def_with scripting_tests
 
 %define commit 588860e30721bf5453b0440c390865a8e85dcae5
 %global shortcommit %(c=%{commit}; echo ${c:0:7})
@@ -21,6 +22,7 @@ Patch0: 0001-use-system-check.patch
 Patch1: 0002-use-system-lua-duktape.patch
 Patch2: 0003-fix-svace-null-after-deref-and-use-after-free.patch
 Patch3: 0004-fix-test-ssl-cert-path-and-init-library.patch
+Patch4: 0005-add-lua-duktape-integration-tests.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
@@ -78,6 +80,7 @@ This package contains shared libs for Civetweb server.
 %patch1 -p1
 %patch2 -p1
 %patch3 -p1
+%patch4 -p1
 
 %build
 %cmake . \
@@ -111,11 +114,16 @@ This package contains shared libs for Civetweb server.
 # SSL cert tests fixed: WORKING_DIRECTORY=${CMAKE_SOURCE_DIR} + LOCAL_TEST (patch 0004)
 # init-library fixed: NO_SSL_DL (direct OpenSSL linking, no dlopen)
 # server-requests needs cgi_test.cgi pre-built (not a CMake target)
+# scripting tests (lua-script, duktape-script): enabled by default, skip with --without scripting_tests
 mkdir -p output
 gcc -o output/cgi_test.cgi unittest/cgi_test.c
 cd %_cmake__builddir
-CTEST_OUTPUT_ON_FAILURE=1 \
-    ctest -E 'test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6'
+%if_with scripting_tests
+CTEST_EXCLUDE='test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6'
+%else
+CTEST_EXCLUDE='test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6|test-publicserver-lua-script|test-publicserver-duktape-script'
+%endif
+CTEST_OUTPUT_ON_FAILURE=1 ctest -E "$CTEST_EXCLUDE"
 vm-run --kvm=cond --sbin \
     "ip link set lo up; cd $PWD && CTEST_OUTPUT_ON_FAILURE=1 ctest -R test-publicserver-start-stop-http-server-ipv6"
 
@@ -153,6 +161,10 @@ mkdir -p %buildroot%_docdir/civetweb
 - BuildRequires: liblua5.3-devel libduktape-devel
 - mod_duktape.inl already has DUK_VERSION >= 20000L guards (API-compatible with 2.7.0)
 - lua-library.so built from bundled lfs/lsqlite3/LuaXML_lib/sqlite3 extras
+- Add integration tests for Lua and Duktape scripting engines (patch 0005)
+- resources/test_lua.lua: minimal Lua handler (mg.write, HTTP 200)
+- resources/test_duktape.ssjs: minimal Duktape handler (conn.write, HTTP 200)
+- scripting tests enabled by default; skip with --without scripting_tests
 
 * Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt3.git588860e
 - Add %%check: 41 unit tests via system libcheck (patch: use system check
