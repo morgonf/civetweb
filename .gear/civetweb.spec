@@ -24,6 +24,7 @@ Patch2: 0003-fix-svace-null-after-deref-and-use-after-free.patch
 Patch3: 0004-fix-test-ssl-cert-path-and-init-library.patch
 Patch4: 0005-add-lua-duktape-integration-tests.patch
 Patch5: 0006-fix-tls-test-for-openssl3-api.patch
+Patch6: 0007-add-websocket-and-openssl3-tests.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
@@ -83,6 +84,7 @@ This package contains shared libs for Civetweb server.
 %patch3 -p1
 %patch4 -p1
 %patch5 -p1
+%patch6 -p1
 
 %build
 %cmake . \
@@ -162,6 +164,11 @@ mkdir -p %buildroot%_docdir/civetweb
 - Enable WebSocket support (CIVETWEB_ENABLE_WEBSOCKETS=ON)
 - Switch to OpenSSL 3.0 native API (CIVETWEB_SSL_OPENSSL_API_3_0=ON,
   CIVETWEB_SSL_OPENSSL_API_1_1=OFF); system OpenSSL is 3.5.x
+- patch 0006: extend OPENSSL_API_1_1 guard to OPENSSL_API_3_0 in TLS test
+- patch 0007: add dedicated WebSocket (port 8092) and OpenSSL 3.0 (port 8093s)
+  integration tests; WebSocket test exercises all 4 documented callbacks
+  (connect/ready/data/close) and bidirectional framing; TLS test verifies
+  runtime OpenSSL 3.x version and encrypted HTTP request/response
 
 * Sun May 03 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt4.git588860e
 - Enable Lua 5.3 and Duktape support via system libraries

@@ -6,3 +6,4 @@ copy: .gear/0003-fix-svace-null-after-deref-and-use-after-free.patch
 copy: .gear/0004-fix-test-ssl-cert-path-and-init-library.patch
 copy: .gear/0005-add-lua-duktape-integration-tests.patch
 copy: .gear/0006-fix-tls-test-for-openssl3-api.patch
+copy: .gear/0007-add-websocket-and-openssl3-tests.patch
