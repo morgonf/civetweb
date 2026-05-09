@@ -24,7 +24,7 @@ Patch3: 0004-fix-test-ssl-cert-path-and-init-library.patch
 
 BuildRequires(pre): cmake make gcc-c++
 BuildRequires: /proc /dev/pts
-BuildRequires: rpm-build-vm
+BuildRequires: rpm-build-vm iproute2
 BuildRequires: ctest libcheck-devel
 
 %if_enabled zlib
@@ -107,14 +107,17 @@ This package contains shared libs for Civetweb server.
 
 %check
 # Excluded: minimal-http(s)-client connect to github.com/google.com (external DNS unavailable)
-# IPv6 loopback requires full kernel — run via vm-run --kvm=cond (skipped gracefully without KVM)
+# IPv6 loopback: iproute2 in BuildRequires; ip link set lo up then ::1 becomes reachable
 # SSL cert tests fixed: WORKING_DIRECTORY=${CMAKE_SOURCE_DIR} + LOCAL_TEST (patch 0004)
 # init-library fixed: NO_SSL_DL (direct OpenSSL linking, no dlopen)
+# server-requests needs cgi_test.cgi pre-built (not a CMake target)
+mkdir -p output
+gcc -o output/cgi_test.cgi unittest/cgi_test.c
 cd %_cmake__builddir
 CTEST_OUTPUT_ON_FAILURE=1 \
     ctest -E 'test-publicserver-minimal-https?-client|test-publicserver-start-stop-http-server-ipv6'
-vm-run --kvm=cond \
-    "cd %_cmake__builddir && CTEST_OUTPUT_ON_FAILURE=1 ctest -R test-publicserver-start-stop-http-server-ipv6"
+vm-run --kvm=cond --sbin \
+    "ip link set lo up; cd $PWD && CTEST_OUTPUT_ON_FAILURE=1 ctest -R test-publicserver-start-stop-http-server-ipv6"
 
 %install
 %cmake_install
