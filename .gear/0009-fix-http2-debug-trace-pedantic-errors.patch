@@ -1,0 +1,62 @@
+diff --git a/src/http2.inl b/src/http2.inl
+index cea695ed..aa4e05ee 100644
+--- a/src/http2.inl
++++ b/src/http2.inl
+@@ -337,7 +337,7 @@ static struct mg_header hpack_predefined[62] = {{NULL, NULL},
+     (256)  |11111111|11111111|11111111|111111      3fffffff  [30]
+ */
+ 
+-struct {
++static struct {
+ 	uint8_t decoded;
+ 	uint8_t bitcount;
+ 	uint32_t encoded;
+@@ -602,7 +602,7 @@ struct {
+ };
+ 
+ /* highest value with 5, 6, 7, ... 28, 29, 30 and all (32) bits */
+-uint32_t hpack_huff_end_code[] = {0x9,       0x2d,       0x7b,       0xfd,
++static uint32_t hpack_huff_end_code[] = {0x9,       0x2d,       0x7b,       0xfd,
+                                   0,         0x3fc,      0x7fc,      0xffb,
+                                   0x1ffd,    0x3ffd,     0x7ffe,     0,
+                                   0,         0,          0x7fff2,    0xfffed,
+@@ -611,7 +611,7 @@ uint32_t hpack_huff_end_code[] = {0x9,       0x2d,       0x7b,       0xfd,
+                                   0,         0x3ffffffe, 0xFFFFFFFFu};
+ 
+ /* lowest index with 5, 6, 7, ... 28, 29, 30 and all (32) bits */
+-uint8_t hpack_huff_start_index[] = {0,   10,  36,  68,  0,   74,  79, 82,  84,
++static uint8_t hpack_huff_start_index[] = {0,   10,  36,  68,  0,   74,  79, 82,  84,
+                                     90,  92,  0,   0,   0,   95,  98, 106, 119,
+                                     145, 174, 186, 190, 205, 224, 0,  253, 0};
+ 
+@@ -884,10 +884,10 @@ struct http2_settings {
+ };
+ 
+ 
+-const struct http2_settings http2_default_settings =
++static const struct http2_settings http2_default_settings =
+     {4096, 1, UINT32_MAX, 65535, 16384, UINT32_MAX};
+ 
+-const struct http2_settings http2_civetweb_server_settings =
++static const struct http2_settings http2_civetweb_server_settings =
+     {4096, 0, 100, 65535, 16384, 65535};
+ 
+ 
+@@ -1442,7 +1442,7 @@ handle_http2(struct mg_connection *conn)
+ 					    hpack_decode(buf, &i, (int)bytes_read, conn->phys_ctx);
+ 					CHECK_LEAK_HDR_ALLOC(key);
+ 					if (!key) {
+-						DEBUG_TRACE("HTTP2 key decoding error");
++						DEBUG_TRACE("%s", "HTTP2 key decoding error");
+ 						goto clean_http2;
+ 					}
+ 				} else if (/*(idx >= 15) &&*/ (idx <= 61)) {
+@@ -1509,7 +1509,7 @@ handle_http2(struct mg_connection *conn)
+ 					                   conn->phys_ctx); /* leak? */
+ 					CHECK_LEAK_HDR_ALLOC(val);
+ 					if (!val) {
+-						DEBUG_TRACE("HTTP2 value decoding error");
++						DEBUG_TRACE("%s", "HTTP2 value decoding error");
+ 						mg_free((void *)key);
+ 						goto clean_http2;
+ 					}

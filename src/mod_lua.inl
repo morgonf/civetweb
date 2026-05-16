@@ -1886,7 +1886,7 @@ lsp_trace(lua_State *L)
 
 
 /* UUID library and function pointer */
-union {
+static union {
 	void *p;
 	void (*f)(unsigned char uuid[16]);
 } pf_uuid_generate;
@@ -3624,7 +3624,7 @@ lua_ctx_exit(struct mg_context *ctx)
 
 
 /* Execute Lua script from main */
-int
+CIVETWEB_API int
 run_lua(const char *file_name)
 {
 	int func_ret = EXIT_FAILURE;

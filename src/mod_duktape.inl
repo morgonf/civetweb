@@ -57,7 +57,7 @@ mg_duk_fatal_handler(duk_context *duk_ctx, duk_errcode_t code, const char *msg)
 
 #if DUK_VERSION >= 20000L
 /* Dropped from interface */
-duk_int_t duk_peval_file(duk_context *duk_ctx, const char *script);
+static duk_int_t duk_peval_file(duk_context *duk_ctx, const char *script);
 
 static void
 mg_duk_v2_fatal(void *udata, const char *msg)
@@ -98,7 +98,7 @@ push_file_as_string(duk_context *ctx, const char *filename)
 	mg_free(buf);
 }
 
-duk_int_t
+static duk_int_t
 duk_peval_file(duk_context *duk_ctx, const char *script)
 {
 	push_file_as_string(duk_ctx, script);

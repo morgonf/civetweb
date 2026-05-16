@@ -809,7 +809,7 @@ Xml_load(lua_State *L)
 	int result = Xml_eval(L);
 	free(buffer);
 	return result;
-};
+}
 
 /** registers a custom code for the conversion between non-standard characters
 and XML character entities.

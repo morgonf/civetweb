@@ -1,0 +1,311 @@
+diff --git a/unittest/CMakeLists.txt b/unittest/CMakeLists.txt
+index 909eabef..cf31c080 100644
+--- a/unittest/CMakeLists.txt
++++ b/unittest/CMakeLists.txt
+@@ -200,6 +200,12 @@ endif()
+ if (CIVETWEB_ENABLE_DUKTAPE)
+   civetweb_add_test(PublicServer "Duktape Script")
+ endif()
++if (CIVETWEB_ENABLE_WEBSOCKETS)
++  civetweb_add_test(PublicServer "WebSocket Basic")
++endif()
++if (CIVETWEB_ENABLE_SSL AND CIVETWEB_SSL_OPENSSL_API_3_0)
++  civetweb_add_test(PublicServer "TLS with OpenSSL3")
++endif()
+ 
+ # Timer tests
+ civetweb_add_test(Timer "Timer Single Shot")
+diff --git a/unittest/public_server.c b/unittest/public_server.c
+index 2ae9a944..a484987e 100644
+--- a/unittest/public_server.c
++++ b/unittest/public_server.c
+@@ -5018,6 +5018,259 @@ START_TEST(test_minimal_https_server_callback)
+ END_TEST
+ 
+ 
++/****************************************************************************/
++/* WEBSOCKET BASIC TEST                                                     */
++/****************************************************************************/
++
++#if defined(USE_WEBSOCKET)
++
++static const char *ws_basic_welcome = "ws-welcome";
++static const char *ws_basic_pong = "ws-pong";
++static const char *ws_basic_done = "ws-done";
++
++static int
++ws_basic_connect(const struct mg_connection *conn, void *udata)
++{
++	(void)conn;
++	(void)udata;
++	return 0;
++}
++
++static void
++ws_basic_ready(struct mg_connection *conn, void *udata)
++{
++	(void)udata;
++	mg_lock_connection(conn);
++	mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT,
++	                   ws_basic_welcome, strlen(ws_basic_welcome));
++	mg_unlock_connection(conn);
++}
++
++static int
++ws_basic_data(struct mg_connection *conn, int bits, char *data,
++              size_t data_len, void *udata)
++{
++	(void)bits;
++	(void)udata;
++
++	if (data_len == 7 && !memcmp(data, "ws-ping", 7)) {
++		mg_lock_connection(conn);
++		mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT,
++		                   ws_basic_pong, strlen(ws_basic_pong));
++		mg_unlock_connection(conn);
++	} else if (data_len == 6 && !memcmp(data, "ws-bye", 6)) {
++		mg_lock_connection(conn);
++		mg_websocket_write(conn, MG_WEBSOCKET_OPCODE_TEXT,
++		                   ws_basic_done, strlen(ws_basic_done));
++		mg_unlock_connection(conn);
++		return 0;
++	}
++	return 1;
++}
++
++static void
++ws_basic_close(const struct mg_connection *conn, void *udata)
++{
++	(void)conn;
++	(void)udata;
++}
++
++struct ws_basic_client_data {
++	char *data;
++	size_t len;
++	int closed;
++};
++
++static int
++ws_basic_client_data_cb(struct mg_connection *conn, int flags, char *data,
++                        size_t data_len, void *user_data)
++{
++	struct ws_basic_client_data *cd = (struct ws_basic_client_data *)user_data;
++	(void)conn;
++	(void)flags;
++	free(cd->data);
++	cd->data = (char *)malloc(data_len + 1);
++	ck_assert(cd->data != NULL);
++	memcpy(cd->data, data, data_len);
++	cd->data[data_len] = '\0';
++	cd->len = data_len;
++	return 1;
++}
++
++static void
++ws_basic_client_close_cb(const struct mg_connection *conn, void *user_data)
++{
++	struct ws_basic_client_data *cd = (struct ws_basic_client_data *)user_data;
++	(void)conn;
++	cd->closed = 1;
++}
++
++START_TEST(test_websocket_basic)
++{
++	struct mg_context *ctx;
++	struct mg_callbacks callbacks;
++	const char *OPTIONS[6];
++	int opt_idx = 0;
++	struct mg_connection *ws_conn;
++	struct ws_basic_client_data cd = {NULL, 0, 0};
++	char ebuf[256];
++	int i;
++
++	memset((void *)OPTIONS, 0, sizeof(OPTIONS));
++	OPTIONS[opt_idx++] = "listening_ports";
++	OPTIONS[opt_idx++] = "8092";
++	ck_assert_int_le(opt_idx, (int)(sizeof(OPTIONS) / sizeof(OPTIONS[0])));
++
++	memset(&callbacks, 0, sizeof(callbacks));
++	callbacks.log_message = log_msg_func;
++
++	ctx = test_mg_start(&callbacks, NULL, OPTIONS, __LINE__);
++	ck_assert(ctx != NULL);
++
++	ck_assert_uint_ne(mg_check_feature(MG_FEATURES_WEBSOCKET), 0u);
++
++	mg_set_websocket_handler(ctx, "/ws",
++	                         ws_basic_connect,
++	                         ws_basic_ready,
++	                         ws_basic_data,
++	                         ws_basic_close,
++	                         NULL);
++
++	test_sleep(1);
++
++	ws_conn = mg_connect_websocket_client("127.0.0.1", 8092, 0,
++	                                      ebuf, sizeof(ebuf),
++	                                      "/ws", NULL,
++	                                      ws_basic_client_data_cb,
++	                                      ws_basic_client_close_cb,
++	                                      &cd);
++	ck_assert(ws_conn != NULL);
++	ck_assert_str_eq(ebuf, "");
++
++	/* Wait for welcome from ready_handler (mg_set_websocket_handler) */
++	for (i = 0; i < 30 && cd.data == NULL; i++)
++		test_sleep(1);
++	ck_assert(cd.data != NULL);
++	ck_assert_str_eq(cd.data, ws_basic_welcome);
++	free(cd.data);
++	cd.data = NULL;
++
++	/* Ping -> pong: mg_websocket_client_write / mg_websocket_write */
++	mg_websocket_client_write(ws_conn, MG_WEBSOCKET_OPCODE_TEXT,
++	                          "ws-ping", 7);
++	for (i = 0; i < 30 && cd.data == NULL; i++)
++		test_sleep(1);
++	ck_assert(cd.data != NULL);
++	ck_assert_str_eq(cd.data, ws_basic_pong);
++	free(cd.data);
++	cd.data = NULL;
++
++	/* Bye -> done: data_handler returns 0 to close the connection */
++	mg_websocket_client_write(ws_conn, MG_WEBSOCKET_OPCODE_TEXT,
++	                          "ws-bye", 6);
++	for (i = 0; i < 30 && cd.data == NULL; i++)
++		test_sleep(1);
++	ck_assert(cd.data != NULL);
++	ck_assert_str_eq(cd.data, ws_basic_done);
++	free(cd.data);
++	cd.data = NULL;
++
++	mg_close_connection(ws_conn);
++	test_sleep(1);
++
++	test_mg_stop(ctx, __LINE__);
++}
++END_TEST
++#endif /* USE_WEBSOCKET */
++
++
++/****************************************************************************/
++/* OPENSSL 3.0 API FUNCTIONAL TEST                                          */
++/****************************************************************************/
++
++#if defined(OPENSSL_API_3_0) && !defined(NO_SSL)
++#include <openssl/opensslv.h>
++#include <openssl/crypto.h>
++
++static int
++tls3_request_handler(struct mg_connection *conn, void *cbdata)
++{
++	(void)cbdata;
++	mg_printf(conn,
++	          "HTTP/1.1 200 OK\r\n"
++	          "Content-Type: text/plain\r\n"
++	          "Content-Length: 14\r\n"
++	          "Connection: close\r\n\r\n"
++	          "OpenSSL 3 OK\n");
++	return 200;
++}
++
++START_TEST(test_tls_openssl3)
++{
++	struct mg_context *ctx;
++	struct mg_callbacks callbacks;
++	const char *OPTIONS[8];
++	int opt_idx = 0;
++	const char *ssl_cert = locate_ssl_cert();
++	struct mg_connection *client_conn;
++	const struct mg_response_info *client_ri;
++	char client_err[256];
++	char client_data[256];
++	int client_res;
++	unsigned long ossl_ver;
++
++	/* Runtime: verify we are running OpenSSL 3.x */
++	ossl_ver = OpenSSL_version_num();
++	ck_assert_uint_ge(ossl_ver, (unsigned long)0x30000000L);
++
++	ck_assert_uint_ne(mg_check_feature(MG_FEATURES_SSL), 0u);
++	ck_assert(ssl_cert != NULL);
++
++	memset((void *)OPTIONS, 0, sizeof(OPTIONS));
++	OPTIONS[opt_idx++] = "listening_ports";
++	OPTIONS[opt_idx++] = "8093s";
++	OPTIONS[opt_idx++] = "ssl_certificate";
++	OPTIONS[opt_idx++] = ssl_cert;
++	ck_assert_int_le(opt_idx, (int)(sizeof(OPTIONS) / sizeof(OPTIONS[0])));
++
++	memset(&callbacks, 0, sizeof(callbacks));
++	callbacks.log_message = log_msg_func;
++
++	ctx = test_mg_start(&callbacks, NULL, OPTIONS, __LINE__);
++	ck_assert(ctx != NULL);
++
++	mg_set_request_handler(ctx, "/tls3check", tls3_request_handler, NULL);
++
++	test_sleep(1);
++
++	memset(client_err, 0, sizeof(client_err));
++	client_conn = mg_connect_client("127.0.0.1", 8093, 1,
++	                                client_err, sizeof(client_err));
++	ck_assert_str_eq(client_err, "");
++	ck_assert(client_conn != NULL);
++
++	mg_printf(client_conn,
++	          "GET /tls3check HTTP/1.0\r\nHost: localhost\r\n\r\n");
++	client_res = mg_get_response(client_conn, client_err,
++	                             sizeof(client_err), 10000);
++	ck_assert_int_gt(client_res, 0);
++	ck_assert_str_eq(client_err, "");
++
++	client_ri = mg_get_response_info(client_conn);
++	ck_assert(client_ri != NULL);
++	ck_assert_int_eq(client_ri->status_code, 200);
++
++	memset(client_data, 0, sizeof(client_data));
++	mg_read(client_conn, client_data, sizeof(client_data) - 1);
++	ck_assert(strstr(client_data, "OpenSSL 3 OK") != NULL);
++
++	mg_close_connection(client_conn);
++	test_mg_stop(ctx, __LINE__);
++}
++END_TEST
++#endif /* OPENSSL_API_3_0 && !NO_SSL */
++
++
+ #if defined(USE_LUA)
+ START_TEST(test_lua_script)
+ {
+@@ -5164,6 +5417,12 @@ make_public_server_suite(void)
+ #if defined(USE_DUKTAPE)
+ 	TCase *const tcase_duktape_script = tcase_create("Duktape Script");
+ #endif
++#if defined(USE_WEBSOCKET)
++	TCase *const tcase_websocket_basic = tcase_create("WebSocket Basic");
++#endif
++#if defined(OPENSSL_API_3_0) && !defined(NO_SSL)
++	TCase *const tcase_tls_openssl3 = tcase_create("TLS with OpenSSL3");
++#endif
+ 
+ 
+ 	tcase_add_test(tcase_checktestenv, test_the_test_environment);
+@@ -5261,6 +5520,16 @@ make_public_server_suite(void)
+ 	tcase_set_timeout(tcase_duktape_script, civetweb_min_server_test_timeout);
+ 	suite_add_tcase(suite, tcase_duktape_script);
+ #endif
++#if defined(USE_WEBSOCKET)
++	tcase_add_test(tcase_websocket_basic, test_websocket_basic);
++	tcase_set_timeout(tcase_websocket_basic, civetweb_min_server_test_timeout);
++	suite_add_tcase(suite, tcase_websocket_basic);
++#endif
++#if defined(OPENSSL_API_3_0) && !defined(NO_SSL)
++	tcase_add_test(tcase_tls_openssl3, test_tls_openssl3);
++	tcase_set_timeout(tcase_tls_openssl3, civetweb_min_server_test_timeout);
++	suite_add_tcase(suite, tcase_tls_openssl3);
++#endif
+ 
+ 	return suite;
+ }

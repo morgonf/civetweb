@@ -194,6 +194,12 @@ civetweb_add_test(PublicServer "Error handling")
 civetweb_add_test(PublicServer "Error logging")
 civetweb_add_test(PublicServer "Limit speed")
 civetweb_add_test(PublicServer "Large file")
+if (CIVETWEB_ENABLE_LUA)
+  civetweb_add_test(PublicServer "Lua Script")
+endif()
+if (CIVETWEB_ENABLE_DUKTAPE)
+  civetweb_add_test(PublicServer "Duktape Script")
+endif()
 
 # Timer tests
 civetweb_add_test(Timer "Timer Single Shot")

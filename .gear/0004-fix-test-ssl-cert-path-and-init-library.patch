@@ -1,0 +1,22 @@
+diff --git a/unittest/CMakeLists.txt b/unittest/CMakeLists.txt
+--- a/unittest/CMakeLists.txt
++++ b/unittest/CMakeLists.txt
+@@ -35,7 +35,8 @@ target_include_directories(
+ target_include_directories(
+   public-server-c-unit-tests PUBLIC
+   ${PROJECT_SOURCE_DIR}/include)
+ target_link_libraries(public-server-c-unit-tests civetweb-c-library PkgConfig::CHECK)
++target_compile_definitions(public-server-c-unit-tests PRIVATE LOCAL_TEST)
+ 
+ 
+ add_library(private-c-unit-tests STATIC private.c)
+@@ -85,7 +86,8 @@ macro(civetweb_add_test suite test_case)
+   string(REGEX REPLACE "[^-A-Za-z0-9]" "-" test "${test}")
+   add_test(
+     NAME ${test}
+-    COMMAND main-c-unit-test "--test-dir=${CMAKE_CURRENT_SOURCE_DIR}" "--suite=${suite}" "--test-case=${test_case}")
++    COMMAND main-c-unit-test "--test-dir=${CMAKE_CURRENT_SOURCE_DIR}" "--suite=${suite}" "--test-case=${test_case}"
++    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+   if (WIN32)
+     string(REPLACE ";" "\\;" test_path "$ENV{PATH}")
+     set_tests_properties(${test} PROPERTIES

@@ -42,7 +42,9 @@
 /* luaL_typerror always used with arg at ndx == NULL */
 #define luaL_typerror(L,ndx,str) luaL_error(L,"bad argument %d (%s expected, got nil)",ndx,str)
 /* luaL_register used once, so below expansion is OK for this case */
+#ifndef luaL_register
 #define luaL_register(L,name,reg) lua_newtable(L);luaL_setfuncs(L,reg,0)
+#endif
 /* luaL_openlib always used with name == NULL */
 #define luaL_openlib(L,name,reg,nup) luaL_setfuncs(L,reg,nup)
 

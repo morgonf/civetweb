@@ -964,6 +964,7 @@ static int
 run_duktape(const char *file_name)
 {
 	duk_context *ctx = NULL;
+	int eval_failed = 0;
 
 	ctx = duk_create_heap_default();
 	if (!ctx) {
@@ -971,7 +972,32 @@ run_duktape(const char *file_name)
 		goto finished;
 	}
 
-	if (duk_peval_file(ctx, file_name) != 0) {
+#if DUK_VERSION >= 20000L
+	{
+		FILE *f = fopen(file_name, "rb");
+		long flen = 0;
+		char *fbuf = NULL;
+		if (f) {
+			fseek(f, 0, SEEK_END);
+			flen = ftell(f);
+			rewind(f);
+			fbuf = (char *)malloc((size_t)flen);
+		}
+		if (fbuf) {
+			fread(fbuf, 1, (size_t)flen, f);
+			fclose(f);
+			duk_push_lstring(ctx, fbuf, (duk_size_t)flen);
+			free(fbuf);
+		} else {
+			if (f) fclose(f);
+			duk_push_undefined(ctx);
+		}
+		eval_failed = (duk_peval(ctx) != 0);
+	}
+#else
+	eval_failed = (duk_peval_file(ctx, file_name) != 0);
+#endif
+	if (eval_failed) {
 		fprintf(stderr, "%s\n", duk_safe_to_string(ctx, -1));
 		goto finished;
 	}

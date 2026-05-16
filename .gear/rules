@@ -1,2 +1,11 @@
 spec: .gear/civetweb.spec
 tar: git588860e:.
+copy: .gear/0001-use-system-check.patch
+copy: .gear/0002-use-system-lua-duktape.patch
+copy: .gear/0003-fix-svace-null-after-deref-and-use-after-free.patch
+copy: .gear/0004-fix-test-ssl-cert-path-and-init-library.patch
+copy: .gear/0005-add-lua-duktape-integration-tests.patch
+copy: .gear/0006-fix-tls-test-for-openssl3-api.patch
+copy: .gear/0007-add-websocket-and-openssl3-tests.patch
+copy: .gear/0008-add-cmake-options-for-http2-and-x-dom-socket.patch
+copy: .gear/0009-fix-http2-debug-trace-pedantic-errors.patch
