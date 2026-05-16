@@ -102,6 +102,7 @@ This package contains shared libs for Civetweb server.
     -DBUILD_SHARED_LIBS:BOOL=ON \
     -DCIVETWEB_BUILD_TESTING:BOOL=ON \
     -DCIVETWEB_ENABLE_WEBSOCKETS:BOOL=ON \
+    -DCIVETWEB_THREAD_STACK_SIZE=0 \
 %if_enabled lua
     -DCIVETWEB_ENABLE_LUA:BOOL=ON \
     -DCIVETWEB_ENABLE_LUA_SHARED:BOOL=ON \
@@ -176,6 +177,13 @@ mkdir -p %buildroot%_docdir/civetweb
 %_pkgconfigdir/*.pc
 
 %changelog
+* Sat May 16 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt5.git588860e
+- Fix potential SIGSEGV under compilers with function reordering: add
+  -DCIVETWEB_THREAD_STACK_SIZE=0 to use system default thread stack (8MB)
+  instead of civetweb embedded default (100KB). Root cause: 100KB worker
+  thread stack overflows when function reordering changes code generation
+  and increases stack usage of handle_static_file_request + mg_vprintf.
+
 * Sat May 09 2026 Andrey Kuznetcov <morgonf@altlinux.org> 1.16-alt5.git588860e
 - Enable WebSocket support (CIVETWEB_ENABLE_WEBSOCKETS=ON)
 - Switch to OpenSSL 3.0 native API (CIVETWEB_SSL_OPENSSL_API_3_0=ON,
