@@ -18459,8 +18459,10 @@ mg_close_connection(struct mg_connection *conn)
 		 * timeouts, we will just wait a few seconds in mg_join_thread. */
 
 		/* join worker thread */
-		for (i = 0; i < conn->phys_ctx->spawned_worker_threads; i++) {
-			mg_join_thread(conn->phys_ctx->worker_threadids[i]);
+		if (conn->phys_ctx->worker_threadids) {
+			for (i = 0; i < conn->phys_ctx->spawned_worker_threads; i++) {
+				mg_join_thread(conn->phys_ctx->worker_threadids[i]);
+			}
 		}
 	}
 #endif /* defined(USE_WEBSOCKET) */
@@ -19472,7 +19474,6 @@ websocket_client_thread(void *data)
 	if (cdata->conn->phys_ctx) {
 		if (cdata->conn->phys_ctx->callbacks.init_thread) {
 			/* 3 indicates a websocket client thread */
-			/* TODO: check if conn->phys_ctx can be set */
 			user_thread_ptr = cdata->conn->phys_ctx->callbacks.init_thread(
 			    cdata->conn->phys_ctx, 3);
 		}
@@ -19488,12 +19489,14 @@ websocket_client_thread(void *data)
 
 	/* The websocket_client context has only this thread. If it runs out,
 	set the stop_flag to 2 (= "stopped"). */
-	STOP_FLAG_ASSIGN(&cdata->conn->phys_ctx->stop_flag, 2);
+	if (cdata->conn->phys_ctx) {
+		STOP_FLAG_ASSIGN(&cdata->conn->phys_ctx->stop_flag, 2);
 
-	if (cdata->conn->phys_ctx->callbacks.exit_thread) {
-		cdata->conn->phys_ctx->callbacks.exit_thread(cdata->conn->phys_ctx,
-		                                             3,
-		                                             user_thread_ptr);
+		if (cdata->conn->phys_ctx->callbacks.exit_thread) {
+			cdata->conn->phys_ctx->callbacks.exit_thread(cdata->conn->phys_ctx,
+			                                             3,
+			                                             user_thread_ptr);
+		}
 	}
 
 	mg_free((void *)cdata);
