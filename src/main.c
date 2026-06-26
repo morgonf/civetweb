@@ -524,12 +524,13 @@ set_option(const char **options, const char *name, const char *value)
 		}
 		if (!strcmp(name, main_config_options[OPTION_ADD_DOMAIN].name)) {
 			if (g_num_add_domains > 0) {
-				g_add_domain = (const char **)realloc(
+				const char **tmp = (const char **)realloc(
 				    (void *)g_add_domain,
 				    sizeof(char *) * ((unsigned)g_num_add_domains + 1u));
-				if (!g_add_domain) {
+				if (!tmp) {
 					die("Out of memory");
 				}
+				g_add_domain = tmp;
 				g_add_domain[g_num_add_domains] = sdup(value);
 				g_num_add_domains++;
 			} else {

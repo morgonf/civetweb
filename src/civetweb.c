@@ -11754,7 +11754,7 @@ prepare_cgi_environment(struct mg_connection *conn,
 	/* SCRIPT_NAME */
 	uri_len = (int)strlen(conn->request_info.local_uri);
 	if (conn->path_info == NULL) {
-		if (conn->request_info.local_uri[uri_len - 1] != '/') {
+		if ((uri_len > 0) && (conn->request_info.local_uri[uri_len - 1] != '/')) {
 			/* URI: /path_to_script/script.cgi */
 			addenv(env, "SCRIPT_NAME=%s", conn->request_info.local_uri);
 		} else {
