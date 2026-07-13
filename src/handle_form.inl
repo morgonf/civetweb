@@ -746,16 +746,29 @@ mg_handle_form_request(struct mg_connection *conn,
 				/* skip over the preamble until we find a complete boundary
 				 * limit the preamble length to prevent abuse */
 				/* +2 for the -- preceding the boundary */
-				while (preamble_length < 1024
-				       && (preamble_length < buf_fill - bl)
+				/* preamble_length must never exceed buf_fill: compute the
+				 * scan limit as min(1024, buf_fill - bl) without letting
+				 * buf_fill - bl underflow when buf_fill < bl (both are
+				 * size_t; a request body shorter than the boundary would
+				 * otherwise wrap the limit to SIZE_MAX). */
+				size_t preamble_limit = (buf_fill > bl) ? (buf_fill - bl) : 0;
+				if (preamble_limit > 1024) {
+					preamble_limit = 1024;
+				}
+				while (preamble_length < preamble_limit
 				       && strncmp(buf + preamble_length + 2, boundary, bl)) {
 					preamble_length++;
 				}
-				/* reset the start of buf to remove the preamble */
+				/* reset the start of buf to remove the preamble.
+				 * preamble_length <= preamble_limit <= buf_fill here, so
+				 * buf_fill - preamble_length can no longer underflow, and
+				 * the previous (unsigned) truncation to 32 bit - which
+				 * turned that underflow into a ~4 GB memmove() size once
+				 * preamble_length reached 1024 - is no longer needed. */
 				if (0 == strncmp(buf + preamble_length + 2, boundary, bl)) {
 					memmove(buf,
 					        buf + preamble_length,
-					        (unsigned)buf_fill - (unsigned)preamble_length);
+					        buf_fill - preamble_length);
 					buf_fill -= preamble_length;
 					buf[buf_fill] = 0;
 				}
