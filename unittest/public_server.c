@@ -4100,6 +4100,208 @@ START_TEST(test_handle_form)
 }
 END_TEST
 
+static int
+field_found_ignore_all(const char *key,
+                       const char *filename,
+                       char *path,
+                       size_t pathlen,
+                       void *user_data)
+{
+	/* Regression test helper for civetweb issue #1404: accept any field
+	 * without touching the shared field_found/field_get state machine
+	 * used by the other Form* handlers in this file. */
+	(void)key;
+	(void)filename;
+	(void)path;
+	(void)pathlen;
+	(void)user_data;
+
+	return MG_FORM_FIELD_STORAGE_SKIP;
+}
+
+
+static int
+FormMultipartPreambleAttack(struct mg_connection *conn, void *cbdata)
+{
+	struct mg_form_data_handler fdh = {field_found_ignore_all,
+	                                   NULL,
+	                                   NULL,
+	                                   NULL};
+	int ret;
+
+	(void)cbdata;
+
+	mg_printf(conn, "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\n");
+	ret = mg_handle_form_request(conn, &fdh);
+	mg_printf(conn, "%i\r\n", ret);
+
+	mark_point();
+
+	return 1;
+}
+
+
+
+/* Regression test for civetweb issue #1404: stack-buffer-overflow in
+ * mg_handle_form_request() via a crafted multipart preamble.
+ *
+ * Two requests over one keep-alive connection, handled by the same worker
+ * thread and therefore reusing the same per-worker stack:
+ *   1) a well-formed multipart body whose preamble is exactly 1024 bytes
+ *      (the preamble scan's hard cap) followed by "--" and the boundary.
+ *      This leaves the boundary string at a fixed, known offset inside the
+ *      reused local buf[MG_BUF_LEN] stack array.
+ *   2) a body shorter than the boundary string, over the SAME connection.
+ *      On the vulnerable code, buf_fill < bl underflows the size_t loop
+ *      guard, so preamble_length always climbs to the 1024 cap; the residue
+ *      from request 1 then makes the post-loop boundary check match, and
+ *      (unsigned)buf_fill - (unsigned)preamble_length wraps to ~4 GB, used
+ *      as a memmove() size into the 8 KB stack buffer - a stack-buffer-
+ *      overflow that crashes the worker thread (and this in-process test).
+ * With the fix, preamble_length can no longer exceed buf_fill, so both
+ * requests get a normal 200 response and the connection survives. */
+START_TEST(test_multipart_preamble_overflow)
+{
+	struct mg_context *ctx;
+	const char *OPTIONS[8];
+	int opt_idx = 0;
+	const char *attack_boundary = "issue-1404-regression-boundary";
+	char preamble[1024];
+	char seed_tail[256];
+	char ebuf[256];
+	int seed_tail_len;
+	size_t bl;
+	struct mg_connection *conn;
+	const struct mg_response_info *ri;
+	int res;
+
+	mark_point();
+
+	memset((void *)OPTIONS, 0, sizeof(OPTIONS));
+	OPTIONS[opt_idx++] = "listening_ports";
+	OPTIONS[opt_idx++] = "8894";
+	OPTIONS[opt_idx++] = "enable_keep_alive";
+	OPTIONS[opt_idx++] = "yes";
+	OPTIONS[opt_idx++] = "request_timeout_ms";
+	OPTIONS[opt_idx++] = "10000";
+	ck_assert_int_le(opt_idx, (int)(sizeof(OPTIONS) / sizeof(OPTIONS[0])));
+	ck_assert(OPTIONS[sizeof(OPTIONS) / sizeof(OPTIONS[0]) - 1] == NULL);
+
+	ctx = test_mg_start(NULL, &g_ctx, OPTIONS, __LINE__);
+	ck_assert(ctx != NULL);
+	g_ctx = ctx;
+
+	mg_set_request_handler(ctx,
+	                       "/handle_form_multipart_attack",
+	                       FormMultipartPreambleAttack,
+	                       NULL);
+
+	test_sleep(1);
+
+	bl = strlen(attack_boundary);
+	ck_assert_uint_ge(bl, 4);
+	ck_assert_uint_lt(bl, 71);
+
+	memset(preamble, 'A', sizeof(preamble));
+
+	seed_tail_len = snprintf(seed_tail,
+	                         sizeof(seed_tail),
+	                         "--%s\r\n"
+	                         "Content-Disposition: form-data; name=\"x\"\r\n"
+	                         "\r\n"
+	                         "seed\r\n"
+	                         "--%s--\r\n",
+	                         attack_boundary,
+	                         attack_boundary);
+	ck_assert_int_gt(seed_tail_len, 0);
+	ck_assert_uint_lt((size_t)seed_tail_len, sizeof(seed_tail));
+
+	memset(ebuf, 0, sizeof(ebuf));
+	conn = mg_connect_client("127.0.0.1", 8894, 0, ebuf, sizeof(ebuf));
+	ck_assert_str_eq(ebuf, "");
+	ck_assert(conn != NULL);
+
+	/* Request 1 (seed): well-formed multipart body, planting the boundary
+	 * string at buf[1024 + 2 .. 1024 + 2 + bl). */
+	mg_printf(conn,
+	          "POST /handle_form_multipart_attack HTTP/1.1\r\n"
+	          "Host: localhost:8894\r\n"
+	          "Connection: keep-alive\r\n"
+	          "Content-Type: multipart/form-data; boundary=%s\r\n"
+	          "Content-Length: %u\r\n"
+	          "\r\n",
+	          attack_boundary,
+	          (unsigned int)(sizeof(preamble) + (size_t)seed_tail_len));
+	mg_write(conn, preamble, sizeof(preamble));
+	mg_write(conn, seed_tail, (size_t)seed_tail_len);
+
+	res = mg_get_response(conn, ebuf, sizeof(ebuf), 10000);
+	ck_assert_int_ge(res, 0);
+	ri = mg_get_response_info(conn);
+	ck_assert(ri != NULL);
+	ck_assert_int_eq(ri->status_code, 200);
+
+	/* Request 2 (attack): body shorter than the boundary string, over the
+	 * SAME connection/thread as request 1, so the worker reuses the stack
+	 * where request 1 planted the boundary residue. On the vulnerable code
+	 * this crashes the worker; on the fixed code it is handled safely.
+	 *
+	 * The attack request's OWN response is deliberately NOT asserted: it is
+	 * malformed input, and whether the (HTTP/1.0) keep-alive connection
+	 * yields a 200 or is simply closed (res == -1) differs by platform
+	 * (observed: 200 on x86_64/i586, connection closed on aarch64). Either
+	 * is acceptable - the security property under test is "the server does
+	 * not crash", verified below by a liveness probe, not by this reply. */
+	mg_printf(conn,
+	          "POST /handle_form_multipart_attack HTTP/1.1\r\n"
+	          "Host: localhost:8894\r\n"
+	          "Connection: close\r\n"
+	          "Content-Type: multipart/form-data; boundary=%s\r\n"
+	          "Content-Length: 4\r\n"
+	          "\r\n",
+	          attack_boundary);
+	mg_write(conn, "\x05\x2d\x15\x58", 4);
+
+	/* Drain whatever the server sends (or does not); result is irrelevant. */
+	(void)mg_get_response(conn, ebuf, sizeof(ebuf), 10000);
+	mg_close_connection(conn);
+
+	/* Liveness probe: if the attack had crashed a worker, the whole
+	 * in-process server would be dead and this fresh, well-formed request
+	 * would fail. A normal 200 proves the server survived the attack. */
+	memset(ebuf, 0, sizeof(ebuf));
+	conn = mg_connect_client("127.0.0.1", 8894, 0, ebuf, sizeof(ebuf));
+	ck_assert_str_eq(ebuf, "");
+	ck_assert(conn != NULL);
+
+	mg_printf(conn,
+	          "POST /handle_form_multipart_attack HTTP/1.1\r\n"
+	          "Host: localhost:8894\r\n"
+	          "Connection: close\r\n"
+	          "Content-Type: multipart/form-data; boundary=%s\r\n"
+	          "Content-Length: %u\r\n"
+	          "\r\n",
+	          attack_boundary,
+	          (unsigned int)(sizeof(preamble) + (size_t)seed_tail_len));
+	mg_write(conn, preamble, sizeof(preamble));
+	mg_write(conn, seed_tail, (size_t)seed_tail_len);
+
+	res = mg_get_response(conn, ebuf, sizeof(ebuf), 10000);
+	ck_assert_int_ge(res, 0);
+	ri = mg_get_response_info(conn);
+	ck_assert(ri != NULL);
+	ck_assert_int_eq(ri->status_code, 200);
+
+	mg_close_connection(conn);
+
+	/* Close the server */
+	g_ctx = NULL;
+	test_mg_stop(ctx, __LINE__);
+
+	mark_point();
+}
+END_TEST
+
 
 START_TEST(test_http_auth)
 {
@@ -5892,6 +6094,8 @@ make_public_server_suite(void)
 	TCase *const tcase_serverrequests = tcase_create("Server Requests");
 	TCase *const tcase_storebody = tcase_create("Store Body");
 	TCase *const tcase_handle_form = tcase_create("Handle Form");
+	TCase *const tcase_multipart_preamble_overflow =
+	    tcase_create("Multipart Preamble Overflow");
 	TCase *const tcase_http_auth = tcase_create("HTTP Authentication");
 	TCase *const tcase_keep_alive = tcase_create("HTTP Keep Alive");
 	TCase *const tcase_error_handling = tcase_create("Error handling");
@@ -5961,6 +6165,12 @@ make_public_server_suite(void)
 	tcase_add_test(tcase_handle_form, test_handle_form);
 	tcase_set_timeout(tcase_handle_form, civetweb_mid_server_test_timeout);
 	suite_add_tcase(suite, tcase_handle_form);
+
+	tcase_add_test(tcase_multipart_preamble_overflow,
+	               test_multipart_preamble_overflow);
+	tcase_set_timeout(tcase_multipart_preamble_overflow,
+	                  civetweb_mid_server_test_timeout);
+	suite_add_tcase(suite, tcase_multipart_preamble_overflow);
 
 	tcase_add_test(tcase_http_auth, test_http_auth);
 	tcase_set_timeout(tcase_http_auth, civetweb_min_server_test_timeout);
